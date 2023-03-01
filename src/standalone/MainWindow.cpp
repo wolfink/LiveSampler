@@ -1,14 +1,14 @@
 #include "MainWindow.h"
 
 MainWindow::MainWindow(const String& name) :
-	DocumentWindow(name, background_color, allButtons)
+	DocumentWindow(name, _background_color, allButtons)
 {
 	setOpaque(true);
 	setUsingNativeTitleBar(true);
-	audio_processor = std::make_unique<LiveSamplerAudioProcessor>();
-	setContentOwned(audio_processor->createEditor(), true);
-	setResizable(true, true);
+	_mainComponent.setSize(800, 600);
+	setContentOwned(&_mainComponent, true);
 	centreWithSize(getWidth(), getHeight());
+	setResizable(true, true);
 	setVisible(true);
 }
 

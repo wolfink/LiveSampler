@@ -1,12 +1,17 @@
 #pragma once
 
 #include <JuceHeader.h>
-#include "PluginEditor.h"
+#include "LiveSampler.h"
+
+#define PARAMETER(id) *params.getRawParameterValue(id##_ID)
 
 class LiveSamplerAudioProcessor : public AudioProcessor
 {
+	bool _mono;
 public:
+	AudioProcessorValueTreeState params;
 	LiveSamplerAudioProcessor();
+	void setMono(bool mono) { _mono = mono; }
 	//=================================================================================
 	// Inherited from AudioProcessor
 	//=================================================================================

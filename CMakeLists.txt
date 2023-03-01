@@ -6,12 +6,16 @@ set(LIVESAMPLER_VERSION "0.1.0")
 set(LIVESAMPLER_COMPANY_NAME "wolfink")
 set(LIVESAMPLER_COMPANY_WEBSITE "github.com/wolfink/LiveSampler")
 
+set(SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src)
+
 # include submodule libraries
 add_subdirectory(extern)
 
 file(GLOB LiveSamplerSources 
-    src/*.cpp
-    src/*.h
+    ${SRC_DIR}/*.cpp
+    ${SRC_DIR}/*.h
+    ${SRC_DIR}/standalone/*.cpp
+    ${SRC_DIR}/standalone/*.h
 )
 
 juce_add_plugin(LiveSampler
