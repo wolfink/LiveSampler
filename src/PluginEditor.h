@@ -9,67 +9,54 @@ class LiveSamplerAudioProcessorEditor :
 {
     LiveSamplerAudioProcessor& _audio_processor;
 
-    class VolumeSlider : public Component
+    class LeftPanel : public Component
     {
-        Slider _slider;
-        Label  _label;
-        uptr<AudioProcessorValueTreeState::SliderAttachment> _attachment;
+		LiveSamplerAudioProcessorEditor& _parent;
+        Slider _sld_in_volume;
+        Slider _sld_mix;
+        Label _lbl_in_volume;
+        Label _lbl_mix;
+        uptr<AudioProcessorValueTreeState::SliderAttachment> _att_in_volume;
+        uptr<AudioProcessorValueTreeState::SliderAttachment> _att_mix;
 
     public:
-        VolumeSlider(String label_text)
-        {
-            _slider.setSliderStyle(Slider::SliderStyle::LinearVertical);
-            _slider.setTextBoxStyle(Slider::TextBoxBelow, true, 30, 30);
-            _slider.setRange(0.0, 1.0, 0.01);
-            addAndMakeVisible(_slider);
+        LeftPanel(LiveSamplerAudioProcessorEditor&);
+        void resized() override;
+    } _left_panel;
 
-            _label.setText(label_text, NotificationType::dontSendNotification);
-            //_label.attachToComponent(&_slider, false);
-            addAndMakeVisible(_label);
-
-        }
-        void attach(AudioProcessorValueTreeState& params, String id)
-        {
-            _attachment = std::make_unique<AudioProcessorValueTreeState::SliderAttachment>(params, id, _slider);
-        }
-        void resized() override
-        {
-            FlexBox flexBox;
-            flexBox.justifyContent = FlexBox::JustifyContent::center;
-            flexBox.items.add(FlexItem(_label).withHeight(30));
-            flexBox.items.add(FlexItem(_slider).withWidth(30).withMargin(FlexItem::Margin(0, 0, 50, 0)));
-            flexBox.performLayout(getLocalBounds());
-        }
-    } _volumeSlider_in, _volumeSlider_out;
-
-    class MonoBox : public Component
+    class MiddlePanel : public Component
     {
-        ComboBox _comboBox;
+		LiveSamplerAudioProcessorEditor& _parent;
+        Slider _sld_pitch_shift;
+        Label _lbl_pitch_shift;
+        uptr<AudioProcessorValueTreeState::SliderAttachment> _att_pitch_shift;
+
     public:
-        MonoBox(LiveSamplerAudioProcessorEditor* editor)
-        {
-            _comboBox.addItemList({ "Mono", "Stereo" }, 1);
-            _comboBox.setSelectedId(1);
-            _comboBox.onChange = [this, editor] {
-                editor->_audio_processor.setMono(_comboBox.getSelectedId());
-            };
-            addAndMakeVisible(_comboBox);
-        }
-        void resized() override
-        {
-            FlexBox flexBox;
-            flexBox.alignItems = FlexBox::AlignItems::center;
-            flexBox.justifyContent = FlexBox::JustifyContent::center;
-            flexBox.items.add(FlexItem(_comboBox)
-                .withHeight(30)
-                .withWidth(80));
-            flexBox.performLayout(getLocalBounds());
-        }
-    } _monoBox;
+        MiddlePanel(LiveSamplerAudioProcessorEditor&);
+        void resized() override;
+    } _middle_panel;
+
+    class RightPanel : public Component
+    {
+		LiveSamplerAudioProcessorEditor& _parent;
+        Slider _sld_out_volume;
+        ComboBox _cmb_mono;
+        Label _lbl_out_volume;
+        Label _lbl_mono;
+        uptr<AudioProcessorValueTreeState::SliderAttachment> _att_out_volume;
+
+    public:
+        RightPanel(LiveSamplerAudioProcessorEditor&);
+        void resized() override;
+    } _right_panel;
+
+
 
 public:
     LiveSamplerAudioProcessorEditor(LiveSamplerAudioProcessor&);
     void paint(Graphics&) override;
     void resized() override;
+private:
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(LiveSamplerAudioProcessorEditor)
 };
 

@@ -5,9 +5,13 @@ AudioProcessorValueTreeState::ParameterLayout getParameterLayout()
 {
 	AudioProcessorValueTreeState::ParameterLayout layout;
 	layout.add(std::make_unique<AudioParameterFloat>(
-		IN_VOLUME_ID, IN_VOLUME_NAME, NormalisableRange<float>(0.0, 1.0, 0.01), 0.0));
+		IN_VOLUME_ID, IN_VOLUME_NAME, NormalisableRange<float>(0.0, 1.0, 0.001), 1.0));
 	layout.add(std::make_unique<AudioParameterFloat>(
-		OUT_VOLUME_ID, OUT_VOLUME_NAME, NormalisableRange<float>(0.0, 1.0, 0.01), 0.0));
+		OUT_VOLUME_ID, OUT_VOLUME_NAME, NormalisableRange<float>(0.0, 1.0, 0.001), 0.0));
+	layout.add(std::make_unique<AudioParameterFloat>(
+		MIX_ID, MIX_NAME, NormalisableRange<float>(0.0, 100.0, 0.1), 50.0));
+	layout.add(std::make_unique<AudioParameterFloat>(
+		PITCH_SHIFT_ID, PITCH_SHIFT_NAME, NormalisableRange<float>(0.0, 4000.0, 0.1), 0.0));
 	return layout;
 }
 LiveSamplerAudioProcessor::LiveSamplerAudioProcessor() :
@@ -15,8 +19,10 @@ LiveSamplerAudioProcessor::LiveSamplerAudioProcessor() :
 		.withInput ("In" , AudioChannelSet::stereo())
 		.withOutput("Out", AudioChannelSet::stereo())),
 	_mono(true),
+	_pitch_shifters(getNumInputChannels()),
 	params(*this, nullptr, "PARAMETERS", getParameterLayout())
 {
+	_fft = std::make_shared<dsp::FFT>(12);
 }
 
 //========================================================================================
@@ -27,6 +33,10 @@ const String LiveSamplerAudioProcessor::getName() const
 
 void LiveSamplerAudioProcessor::prepareToPlay(double sampleRate, int maximumExpectedSamplesPerBlock)
 {
+	for (int i = 0; i < _pitch_shifters.size(); i++) {
+		_pitch_shifters[i].prepare(sampleRate, _fft, 4);
+		_pitch_shifters[i].setShift(220.0);
+	}
 }
 
 void LiveSamplerAudioProcessor::releaseResources()
@@ -36,18 +46,30 @@ void LiveSamplerAudioProcessor::releaseResources()
 void LiveSamplerAudioProcessor::processBlock(AudioBuffer<float>& buffer, MidiBuffer& midiMessages)
 {
 	auto block_size = buffer.getNumSamples();
-	auto buffer_chan_0 = buffer.getWritePointer(0);
 	auto buffer_chan_1 = buffer.getWritePointer(1);
+	auto num_input_channels = getNumInputChannels();
 
 	float in_volume = PARAMETER(IN_VOLUME);
 	float out_volume = PARAMETER(OUT_VOLUME);
+	float mix = PARAMETER(MIX) / 100.0;
+	float shift = PARAMETER(PITCH_SHIFT);
 
 	buffer.applyGain(in_volume);
 
+	for (int channel = 0; channel < num_input_channels; channel++) {
+		auto channel_buffer = buffer.getWritePointer(channel);
+		_pitch_shifters[channel].setMix(mix);
+		_pitch_shifters[channel].setShift(shift);
+		_pitch_shifters[channel].process(channel_buffer, block_size);
+	}
+
+
 	if (_mono) {
+		auto channel_buffer_0 = buffer.getWritePointer(0);
+		auto channel_buffer_1 = buffer.getWritePointer(1);
 		for (int i = 0; i < block_size; i++) {
-			buffer_chan_0[i] = (buffer_chan_0[i] + buffer_chan_1[i]) / 2;
-			buffer_chan_1[i] = buffer_chan_0[i];
+			channel_buffer_0[i] = (channel_buffer_0[i] + buffer_chan_1[i]) / 2;
+			channel_buffer_1[i] = channel_buffer_0[i];
 		}
 	}
 

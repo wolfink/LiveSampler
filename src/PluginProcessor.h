@@ -2,12 +2,15 @@
 
 #include <JuceHeader.h>
 #include "LiveSampler.h"
+#include "PitchShifter.h"
 
 #define PARAMETER(id) *params.getRawParameterValue(id##_ID)
 
 class LiveSamplerAudioProcessor : public AudioProcessor
 {
 	bool _mono;
+	std::shared_ptr<dsp::FFT> _fft;
+	std::vector<PitchShifter> _pitch_shifters;
 public:
 	AudioProcessorValueTreeState params;
 	LiveSamplerAudioProcessor();
@@ -32,4 +35,6 @@ public:
 	virtual void getStateInformation(juce::MemoryBlock& destData) override;
 	virtual void setStateInformation(const void* data, int sizeInBytes) override;
 	//=================================================================================
+private:
+	JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(LiveSamplerAudioProcessor)
 };

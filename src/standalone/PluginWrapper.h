@@ -18,4 +18,6 @@ public:
                                                    const AudioIODeviceCallbackContext& context) override;
 	virtual void audioDeviceAboutToStart(AudioIODevice* device) override;
 	virtual void audioDeviceStopped() override;
+private:
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginWrapper)
 };
