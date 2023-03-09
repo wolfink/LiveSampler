@@ -69,7 +69,7 @@ LiveSamplerAudioProcessorEditor::MiddlePanel::MiddlePanel(LiveSamplerAudioProces
 	_parent(parent)
 {
 	_sld_shift_factor.setSliderStyle(Slider::SliderStyle::RotaryHorizontalVerticalDrag);
-	_sld_shift_factor.setRange(0.1, 4.0, 0.1);
+	_sld_shift_factor.setRange(-1200.0, 1200.0, 1.0);
 	_sld_shift_factor.setSkewFactorFromMidPoint(1.0);
 	_att_shift_factor = std::make_unique<AudioProcessorValueTreeState::SliderAttachment>(
 		_parent._audio_processor.params, SHIFT_FACTOR_ID, _sld_shift_factor);

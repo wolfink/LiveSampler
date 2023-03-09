@@ -11,7 +11,7 @@ AudioProcessorValueTreeState::ParameterLayout getParameterLayout()
 	layout.add(std::make_unique<AudioParameterFloat>(
 		MIX_ID, MIX_NAME, NormalisableRange<float>(0.0, 100.0, 0.1), 50.0));
 	layout.add(std::make_unique<AudioParameterFloat>(
-		SHIFT_FACTOR_ID, SHIFT_FACTOR_NAME, NormalisableRange<float>(0.1, 4.0, 0.1), 1.0));
+		SHIFT_FACTOR_ID, SHIFT_FACTOR_NAME, NormalisableRange<float>(-1200.0, 1200.0, 1.0), 0.0));
 	return layout;
 }
 LiveSamplerAudioProcessor::LiveSamplerAudioProcessor() :
@@ -52,7 +52,7 @@ void LiveSamplerAudioProcessor::processBlock(AudioBuffer<float>& buffer, MidiBuf
 	float in_volume = PARAMETER(IN_VOLUME_ID);
 	float out_volume = PARAMETER(OUT_VOLUME_ID);
 	float mix = PARAMETER(MIX_ID) / 100.0;
-	float shift = PARAMETER(SHIFT_FACTOR_ID);
+	float shift = std::pow(2.0, PARAMETER(SHIFT_FACTOR_ID) / 1200.0);
 
 	buffer.applyGain(in_volume);
 
