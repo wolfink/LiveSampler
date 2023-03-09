@@ -5,6 +5,8 @@ class PitchShifter
 {
 	std::shared_ptr<dsp::FFT> _fft;
 	uptr<dsp::WindowingFunction<float>> _window;
+	std::vector<float> _last_phase;
+	std::vector<float> _running_phase;
 	int _overlap;
 	float _shift;
 	float _sample_rate;

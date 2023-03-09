@@ -4,7 +4,7 @@
 #include "LiveSampler.h"
 #include "PitchShifter.h"
 
-#define PARAMETER(id) *params.getRawParameterValue(id##_ID)
+#define PARAMETER(id) *params.getRawParameterValue(id)
 
 class LiveSamplerAudioProcessor : public AudioProcessor
 {

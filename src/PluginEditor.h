@@ -27,9 +27,9 @@ class LiveSamplerAudioProcessorEditor :
     class MiddlePanel : public Component
     {
 		LiveSamplerAudioProcessorEditor& _parent;
-        Slider _sld_pitch_shift;
+        Slider _sld_shift_factor;
         Label _lbl_pitch_shift;
-        uptr<AudioProcessorValueTreeState::SliderAttachment> _att_pitch_shift;
+        uptr<AudioProcessorValueTreeState::SliderAttachment> _att_shift_factor;
 
     public:
         MiddlePanel(LiveSamplerAudioProcessorEditor&);

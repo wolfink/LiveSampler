@@ -13,19 +13,25 @@ PitchShifter::PitchShifter() :
 
 void PitchShifter::prepare(float sample_rate, std::shared_ptr<dsp::FFT> fft, int overlap)
 {
+	size_t new_size = fft->getSize();
 	_fft = fft;
 	_overlap = overlap;
 	_sample_rate = sample_rate;
-	_in.resize(fft->getSize());
-	_out.resize(fft->getSize());
+	_in.resize(new_size);
+	_out.resize(new_size);
 	_window = std::make_unique<dsp::WindowingFunction<float>>
-		(fft->getSize(), dsp::WindowingFunction<float>::WindowingMethod::blackman);
+		(new_size, dsp::WindowingFunction<float>::WindowingMethod::hann);
+	_last_phase.resize(new_size);
+	_running_phase.resize(new_size);
 }
 
 void PitchShifter::process(float* samples, int num_samples)
 {
 	for (int i = 0; i < num_samples; i++) {
-		if (!_in.push(samples[i])) processFrame();
+		if (!_in.push(samples[i])) {
+			processFrame();
+			_in.push(samples[i]);
+		}
 		samples[i] = _mix * _out.pop() + (1 - _mix) * samples[i];
 	}
 }
@@ -40,30 +46,46 @@ void PitchShifter::processFrame()
 
 	// Multiply frame by window function
 	{
-		std::vector<float> temp(fft_size);
-		for (int i = 0; i < fft_size; i++) temp[i] = _in.readAtIndex(i);
+		std::vector<float> input(fft_size);
+		for (int i = 0; i < fft_size; i++) input[i] = _in.readAtIndex(i);
 		_in.remove(hopsize);
-		_window->multiplyWithWindowingTable(temp.data(), fft_size);
-		for (int i = 0; i < fft_size; i++) in_out[i] = temp[i];
+		_window->multiplyWithWindowingTable(input.data(), fft_size);
+		for (int i = 0; i < fft_size; i++) in_out[i] = input[i];
 	}
 	_fft->perform(in_out.data(), processing.data(), false);
 	shiftPitch(processing);
 	_fft->perform(processing.data(), in_out.data(), true);
 	// Sum fft results into outgoing queue
+	std::vector<float> output(fft_size);
+	for (int i = 0; i < fft_size; i++) output[i] = in_out[i].real();
+	_window->multiplyWithWindowingTable(output.data(), fft_size);
 	for (int i = 0; i < fft_size; i++) {
-		auto val = in_out[i].real() / _overlap;
-		if (!_out.push(val)) // Push into queue until its full
-			_out.writeAtIndex(i, _out.readAtIndex(i) + val);
+			_out.push(0.0);
+			_out.writeAtIndex(i, _out.readAtIndex(i) + output[i]);
 	}
 }
 
 void PitchShifter::shiftPitch(std::vector<dsp::Complex<float>>& frame)
 {
 	auto num_bins = _fft->getSize();
-	int bin_shift = _shift / _sample_rate * num_bins;
-	int bin; for (bin = num_bins - 1; bin >= bin_shift; bin--)
-	{
-		frame[bin] = frame[bin - bin_shift];
+	auto pi = MathConstants<float>::pi;
+	auto analysis_hop = num_bins / _overlap;
+	auto synthesis_hop = _shift * analysis_hop;
+	std::vector<dsp::Complex<float>> shifted_frame(num_bins);
+	for (int bin = 0; bin < num_bins; bin++) {
+		int new_bin = bin * _shift;
+		if (new_bin >= num_bins || new_bin < 0) continue;
+		shifted_frame[bin] = frame[new_bin];
 	}
-	while (bin >= 0) frame[bin--] = 0.0;
+	for (int bin = 0; bin < num_bins; bin++) {
+		float bin_phase = atan2(shifted_frame[bin].imag(), shifted_frame[bin].real());
+		float bin_magnitude = abs(shifted_frame[bin]);
+		float bin_frequency = bin / num_bins * _sample_rate / 2;
+		float heterodyned_phase_increment = bin_phase - _last_phase[bin] + analysis_hop * bin_frequency;
+		float true_frequency_estimate = bin_frequency + heterodyned_phase_increment / analysis_hop;
+		_running_phase[bin] += synthesis_hop * true_frequency_estimate;
+		_last_phase[bin] = bin_phase;
+
+		frame[bin] = std::polar<float>(bin_magnitude, _running_phase[bin]);
+	}
 }

@@ -68,19 +68,20 @@ void LiveSamplerAudioProcessorEditor::LeftPanel::resized()
 LiveSamplerAudioProcessorEditor::MiddlePanel::MiddlePanel(LiveSamplerAudioProcessorEditor& parent) :
 	_parent(parent)
 {
-	_sld_pitch_shift.setSliderStyle(Slider::SliderStyle::RotaryHorizontalVerticalDrag);
-	_sld_pitch_shift.setRange(0.0, 4000.0, 0.1);
-	_att_pitch_shift = std::make_unique<AudioProcessorValueTreeState::SliderAttachment>(
-		_parent._audio_processor.params, PITCH_SHIFT_ID, _sld_pitch_shift);
+	_sld_shift_factor.setSliderStyle(Slider::SliderStyle::RotaryHorizontalVerticalDrag);
+	_sld_shift_factor.setRange(0.1, 4.0, 0.1);
+	_sld_shift_factor.setSkewFactorFromMidPoint(1.0);
+	_att_shift_factor = std::make_unique<AudioProcessorValueTreeState::SliderAttachment>(
+		_parent._audio_processor.params, SHIFT_FACTOR_ID, _sld_shift_factor);
 	_lbl_pitch_shift.setText("Shift", NotificationType::dontSendNotification);
-	_lbl_pitch_shift.attachToComponent(&_sld_pitch_shift, true);
-	addAndMakeVisible(_sld_pitch_shift);
+	_lbl_pitch_shift.attachToComponent(&_sld_shift_factor, true);
+	addAndMakeVisible(_sld_shift_factor);
 }
 
 void LiveSamplerAudioProcessorEditor::MiddlePanel::resized()
 {
 	FlexBox flexBox;
-	flexBox.items.add(FlexItem(_sld_pitch_shift)
+	flexBox.items.add(FlexItem(_sld_shift_factor)
 		.withFlex(1)
 		.withHeight(100)
 		.withMargin({ 0, 0, 0, 80 }));
