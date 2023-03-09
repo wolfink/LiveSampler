@@ -75,7 +75,7 @@ void PitchShifter::shiftPitch(std::vector<dsp::Complex<float>>& frame)
 	for (int bin = 0; bin < num_bins; bin++) {
 		int new_bin = bin * _shift;
 		if (new_bin >= num_bins || new_bin < 0) continue;
-		shifted_frame[bin] = frame[new_bin];
+		shifted_frame[new_bin] = frame[bin];
 	}
 	for (int bin = 0; bin < num_bins; bin++) {
 		float bin_phase = atan2(shifted_frame[bin].imag(), shifted_frame[bin].real());
