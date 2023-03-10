@@ -68,9 +68,9 @@ void PitchShifter::processFrame()
 void PitchShifter::shiftPitch(std::vector<dsp::Complex<float>>& frame)
 {
 	auto num_bins = _fft->getSize();
-	auto pi = MathConstants<float>::pi;
-	auto analysis_hop = num_bins / _overlap;
-	auto synthesis_hop = _shift * analysis_hop;
+	float pi = MathConstants<float>::pi;
+	float analysis_hop = num_bins / _overlap;
+	float synthesis_hop = analysis_hop / _shift;
 	std::vector<dsp::Complex<float>> shifted_frame(num_bins);
 	for (int bin = 0; bin < num_bins; bin++) {
 		int new_bin = bin * _shift;

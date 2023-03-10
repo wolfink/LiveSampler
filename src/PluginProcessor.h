@@ -11,7 +11,20 @@ class LiveSamplerAudioProcessor : public AudioProcessor
 	bool _mono;
 	std::shared_ptr<dsp::FFT> _fft;
 	std::vector<PitchShifter> _pitch_shifters;
+	int _note;
 public:
+	class MidiDisplay : public ChangeBroadcaster
+	{
+		MidiMessage midiMessage;
+	public:
+		MidiDisplay() : midiMessage(MidiMessage()) {}
+		void setMidiMessage(MidiMessage m)
+		{
+			midiMessage = m;
+			sendChangeMessage();
+		}
+		MidiMessage getMidiMessage() { return midiMessage; }
+	} midi_display;
 	AudioProcessorValueTreeState params;
 	LiveSamplerAudioProcessor();
 	void setMono(bool mono) { _mono = mono; }

@@ -28,6 +28,17 @@ class LiveSamplerAudioProcessorEditor :
     {
 		LiveSamplerAudioProcessorEditor& _parent;
         Slider _sld_shift_factor;
+        class MidiDisplayListener : public ChangeListener
+        {
+        public:
+			TextButton txt_midi_display;
+            void changeListenerCallback(ChangeBroadcaster* source) override
+            {
+                LiveSamplerAudioProcessor::MidiDisplay* midiDisplayPtr =
+                    (LiveSamplerAudioProcessor::MidiDisplay*) source;
+                txt_midi_display.setButtonText(midiDisplayPtr->getMidiMessage().getDescription());
+            }
+        } _midi_display_listener;
         Label _lbl_pitch_shift;
         uptr<AudioProcessorValueTreeState::SliderAttachment> _att_shift_factor;
 

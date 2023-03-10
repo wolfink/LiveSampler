@@ -76,6 +76,10 @@ LiveSamplerAudioProcessorEditor::MiddlePanel::MiddlePanel(LiveSamplerAudioProces
 	_lbl_pitch_shift.setText("Shift", NotificationType::dontSendNotification);
 	_lbl_pitch_shift.attachToComponent(&_sld_shift_factor, true);
 	addAndMakeVisible(_sld_shift_factor);
+
+	_midi_display_listener.txt_midi_display.setButtonText("0");
+	parent._audio_processor.midi_display.addChangeListener(&_midi_display_listener);
+	addAndMakeVisible(_midi_display_listener.txt_midi_display);
 }
 
 void LiveSamplerAudioProcessorEditor::MiddlePanel::resized()
@@ -85,6 +89,9 @@ void LiveSamplerAudioProcessorEditor::MiddlePanel::resized()
 		.withFlex(1)
 		.withHeight(100)
 		.withMargin({ 0, 0, 0, 80 }));
+	flexBox.items.add(FlexItem(_midi_display_listener.txt_midi_display)
+		.withFlex(1)
+		.withHeight(40));
 	flexBox.performLayout(getLocalBounds());
 }
 

@@ -35,7 +35,7 @@ void LiveSamplerAudioProcessor::prepareToPlay(double sampleRate, int maximumExpe
 {
 	for (int i = 0; i < _pitch_shifters.size(); i++) {
 		_pitch_shifters[i].prepare(sampleRate, _fft, 4);
-		_pitch_shifters[i].setShift(220.0);
+		_pitch_shifters[i].setShift(0.0);
 	}
 }
 
@@ -53,6 +53,11 @@ void LiveSamplerAudioProcessor::processBlock(AudioBuffer<float>& buffer, MidiBuf
 	float out_volume = PARAMETER(OUT_VOLUME_ID);
 	float mix = PARAMETER(MIX_ID) / 100.0;
 	float shift = std::pow(2.0, PARAMETER(SHIFT_FACTOR_ID) / 1200.0);
+
+	for (auto metadata : midiMessages) {
+		auto message = metadata.getMessage();
+		midi_display.setMidiMessage(message);
+	}
 
 	buffer.applyGain(in_volume);
 
