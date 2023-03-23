@@ -1,4 +1,3 @@
-#include <JuceHeader.h>
 #include "LiveSampler.h"
 
 class PitchShifter
@@ -8,7 +7,8 @@ class PitchShifter
 	std::vector<float> _last_phase;
 	std::vector<float> _running_phase;
 	int _overlap;
-	float _shift;
+	float _shift_factor;
+	float _shift_frequency;
 	float _sample_rate;
 	float _mix;
 
@@ -17,10 +17,12 @@ public:
 	PitchShifter();
 	void prepare(float sample_rate, std::shared_ptr<dsp::FFT> fft, int overlap);
 	void process(float*, int num_samples);
-	void setShift(float shift) { _shift = shift; }
+	//void setShift(float shift) { _shift_factor = shift; }
+	void setShiftFrequency(float shift_frequency) { _shift_frequency = shift_frequency; }
 	void setMix(float mix) { _mix = mix; }
 
 private:
+	float detectPitch(std::vector<float> acfs);
 	void processFrame();
 	void shiftPitch(std::vector<dsp::Complex<float>>& frame);
 

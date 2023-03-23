@@ -35,7 +35,6 @@ void LiveSamplerAudioProcessor::prepareToPlay(double sampleRate, int maximumExpe
 {
 	for (int i = 0; i < _pitch_shifters.size(); i++) {
 		_pitch_shifters[i].prepare(sampleRate, _fft, 4);
-		_pitch_shifters[i].setShift(0.0);
 	}
 }
 
@@ -54,8 +53,10 @@ void LiveSamplerAudioProcessor::processBlock(AudioBuffer<float>& buffer, MidiBuf
 	float mix = PARAMETER(MIX_ID) / 100.0;
 	float shift = std::pow(2.0, PARAMETER(SHIFT_FACTOR_ID) / 1200.0);
 
+	int midi_note = -1;
 	for (auto metadata : midiMessages) {
 		auto message = metadata.getMessage();
+		if (message.isNoteOn()) midi_note = message.getNoteNumber();
 		midi_display.setMidiMessage(message);
 	}
 
@@ -64,7 +65,7 @@ void LiveSamplerAudioProcessor::processBlock(AudioBuffer<float>& buffer, MidiBuf
 	for (int channel = 0; channel < num_input_channels; channel++) {
 		auto channel_buffer = buffer.getWritePointer(channel);
 		_pitch_shifters[channel].setMix(mix);
-		_pitch_shifters[channel].setShift(shift);
+		if (midi_note > -1) _pitch_shifters[channel].setShiftFrequency(MidiMessage::getMidiNoteInHertz(midi_note));
 		_pitch_shifters[channel].process(channel_buffer, block_size);
 	}
 

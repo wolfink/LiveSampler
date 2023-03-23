@@ -1,3 +1,7 @@
+#include <JuceHeader.h>
+#if(_DEBUG)
+#include "debug/Debug.h"
+#endif
 
 // Parameter Macros
 #define IN_VOLUME_ID     "in volume"

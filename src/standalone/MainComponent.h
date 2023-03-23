@@ -1,4 +1,3 @@
-#include <JuceHeader.h>
 #include "../LiveSampler.h"
 #include "../PluginProcessor.h"
 #include "PluginWrapper.h"

@@ -10,6 +10,9 @@ LiveSamplerAudioProcessorEditor::LiveSamplerAudioProcessorEditor(LiveSamplerAudi
 	addAndMakeVisible(_left_panel);
 	addAndMakeVisible(_middle_panel);
 	addAndMakeVisible(_right_panel);
+#if(_DEBUG)
+	addAndMakeVisible(_debug_panel);
+#endif
 	setSize(600, 400);
 }
 
@@ -24,6 +27,9 @@ void LiveSamplerAudioProcessorEditor::paint(Graphics& g)
 void LiveSamplerAudioProcessorEditor::resized()
 {
 	auto area = getLocalBounds();
+#if(_DEBUG)
+	_debug_panel.setBounds(area.removeFromRight(80));
+#endif
 	area.removeFromTop(60);
 	_left_panel.setBounds(area.removeFromLeft(120));
 	_right_panel.setBounds(area.removeFromRight(120));

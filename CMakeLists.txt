@@ -16,6 +16,8 @@ file(GLOB LiveSamplerSources
     ${SRC_DIR}/*.h
     ${SRC_DIR}/standalone/*.cpp
     ${SRC_DIR}/standalone/*.h
+    ${SRC_DIR}/debug/*.h
+    ${SRC_DIR}/debug/*.cpp
 )
 
 juce_add_plugin(LiveSampler

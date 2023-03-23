@@ -44,6 +44,7 @@ class LiveSamplerAudioProcessorEditor :
 
     public:
         MiddlePanel(LiveSamplerAudioProcessorEditor&);
+        ~MiddlePanel() { _parent._audio_processor.midi_display.removeChangeListener(&_midi_display_listener); }
         void resized() override;
     } _middle_panel;
 
@@ -60,6 +61,10 @@ class LiveSamplerAudioProcessorEditor :
         RightPanel(LiveSamplerAudioProcessorEditor&);
         void resized() override;
     } _right_panel;
+
+#if(_DEBUG)
+    DebugPanel _debug_panel;
+#endif
 
 
 

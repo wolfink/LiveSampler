@@ -1,6 +1,5 @@
 #pragma once
 
-#include <JuceHeader.h>
 #include "LiveSampler.h"
 #include "PitchShifter.h"
 
