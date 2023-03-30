@@ -1,5 +1,69 @@
 #include "LiveSampler.h"
 
+class Queue
+{
+	std::vector<float> _arr;
+	size_t _start, _end, _size;
+public:
+	Queue(int array_size, int end = 0) : _arr(array_size), _start(0), _end(0), _size(0)
+	{
+		if (!array_size) return;
+		if (end >= array_size) _end = array_size - 1;
+		_end %= array_size;
+		_size = _end;
+	}
+	bool push(float f)
+	{
+		if (_size >= _arr.size()) return false;
+
+		_end %= _arr.size();
+		_arr[_end++] = f;
+		_size++;
+		return true;
+	}
+	float pop()
+	{
+		if (_size < 1) return 0.0;
+		_start %= _arr.size();
+		_size--;
+		return _arr[_start++];
+	}
+	float readAtIndex(int index)
+	{
+		if (index < _size) return _arr[(_start + index) % _arr.size()];
+		return 0.0;
+	}
+	void writeAtIndex(size_t index, float value)
+	{
+		if (index >= _size) return;
+		_arr[(_start + index) % _arr.size()] = value;
+	}
+	void remove(size_t number_to_remove)
+	{
+		if (number_to_remove < _size)
+		{
+			_size -= number_to_remove;
+			_start = (_start + number_to_remove) % _arr.size();
+		}
+	}
+	void resize(int array_size, int end = 0)
+	{
+		if (array_size <= _arr.size()) return;
+		std::vector<float> temp;
+		for (int i = 0; i < _size; i++) temp.push_back(readAtIndex(i));
+		_end = 0;
+		_start = 0;
+		for (int i = 0; i < temp.size(); i++) push(temp[i]);
+		_arr.resize(array_size);
+
+		if (_end >= array_size) _end = array_size - 1;
+		_end %= array_size;
+		_size = _end;
+	}
+private:
+	JUCE_LEAK_DETECTOR(Queue)
+};
+
 class PitchShifter
 {
 	std::shared_ptr<dsp::FFT> _fft;
@@ -11,6 +75,7 @@ class PitchShifter
 	float _shift_frequency;
 	float _sample_rate;
 	float _mix;
+	Queue _in, _out;
 
 
 public:
@@ -26,59 +91,6 @@ private:
 	void processFrame();
 	void shiftPitch(std::vector<dsp::Complex<float>>& frame);
 
-	class Queue
-	{
-		std::vector<float> _arr;
-		size_t _start, _end, _size;
-	public:
-		Queue(int size) : _arr(size), _start(0), _end(0), _size(0) {}
-		bool push(float f) 
-		{ 
-			if (_size >= _arr.size()) return false;
-
-			_end %= _arr.size();
-			_arr[_end++] = f;
-			_size++;
-			return true;
-		}
-		float pop()
-		{
-			if (_size < 1) return 0.0;
-			_start %= _arr.size();
-			_size--;
-			return _arr[_start++];
-		}
-		float readAtIndex(size_t index)
-		{
-			if (index < _size) return _arr[(_start + index) % _arr.size()];
-			return 0.0;
-		}
-		void writeAtIndex(size_t index, float value)
-		{
-			if (index >= _size) return;
-			_arr[(_start + index) % _arr.size()] = value;
-		}
-		void remove(size_t number_to_remove)
-		{
-			if (number_to_remove < _size)
-			{
-				_size -= number_to_remove;
-				_start = (_start + number_to_remove) % _arr.size();
-			}
-		}
-		void resize(int size)
-		{ 
-			if (size <= _arr.size()) return;
-			std::vector<float> temp;
-			for (int i = 0; i < _size; i++) temp.push_back(readAtIndex(i));
-			_end = 0;
-			_start = 0;
-			for (int i = 0; i < temp.size(); i++) push(temp[i]);
-			_arr.resize(size);
-		}
-	private:
-		JUCE_LEAK_DETECTOR(PitchShifter::Queue)
-	} _in, _out;
 private:
 	JUCE_LEAK_DETECTOR(PitchShifter)
 };
