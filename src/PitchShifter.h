@@ -68,13 +68,69 @@ class PitchShifter
 {
 	std::shared_ptr<dsp::FFT> _fft;
 	uptr<dsp::WindowingFunction<float>> _window;
-	std::vector<float> _last_phase;
-	std::vector<float> _running_phase;
 	int _overlap;
-	float _shift_factor;
-	float _shift_frequency;
+	float _pitch;
 	float _sample_rate;
 	float _mix;
+
+	class Voices
+	{
+		std::vector<float> _freqs;
+		std::vector<std::vector<float>> _phases;
+		PitchShifter& _parent;
+		int _pos;
+	public:
+		Voices(PitchShifter& parent) : _parent(parent), _pos(0) {}
+
+		int getSize() { return _freqs.size(); }
+
+		void setSize(int new_size)
+		{
+			int old_size = _freqs.size();
+			int fft_size = _parent._fft->getSize();
+
+			_freqs.resize(new_size);
+			_phases.resize(new_size);
+			if (new_size > old_size)
+				for (int i = old_size; i < new_size; i++)
+					_phases[i].resize(fft_size);
+		}
+
+		void createVoice(int midi_note)
+		{
+			float frequency = MidiMessage::getMidiNoteInHertz(midi_note);
+			_freqs[_pos++] = frequency;
+			_pos %= _freqs.size();
+		}
+
+		void deleteVoice(int midi_note)
+		{
+			float frequency = MidiMessage::getMidiNoteInHertz(midi_note);
+			int move_back = 0;
+			for (int i = 0; i < _freqs.size(); i++)
+			{
+				if (_freqs[i] == frequency) {
+					move_back++;
+					_freqs[i] = 0;
+				}
+				else if (move_back) {
+					_freqs[i - move_back] = _freqs[i];
+					_freqs[i] = 0;
+				}
+			}
+		}
+		
+		const float& getVoice(int index)
+		{
+			return _freqs[index];
+		}
+
+		std::vector<float>& getPhase(int index)
+		{
+			return _phases[index];
+		}
+	} _voices;
+
 	Queue _in, _out;
 
 
@@ -83,7 +139,9 @@ public:
 	void prepare(float sample_rate, std::shared_ptr<dsp::FFT> fft, int overlap);
 	void process(float*, int num_samples);
 	//void setShift(float shift) { _shift_factor = shift; }
-	void setShiftFrequency(float shift_frequency) { _shift_frequency = shift_frequency; }
+	void createVoice(int midi_note) { _voices.createVoice(midi_note); }
+	void deleteVoice(int midi_note) { _voices.deleteVoice(midi_note); }
+	void setNumShifters(int new_num) { _voices.setSize(new_num); }
 	void setMix(float mix) { _mix = mix; }
 
 private:

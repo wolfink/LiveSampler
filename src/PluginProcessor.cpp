@@ -48,15 +48,22 @@ void LiveSamplerAudioProcessor::processBlock(AudioBuffer<float>& buffer, MidiBuf
 	auto buffer_chan_1 = buffer.getWritePointer(1);
 	auto num_input_channels = getNumInputChannels();
 
+	// Set parameter values
 	float in_volume = PARAMETER(IN_VOLUME_ID);
 	float out_volume = PARAMETER(OUT_VOLUME_ID);
 	float mix = PARAMETER(MIX_ID) / 100.0;
 	float shift = std::pow(2.0, PARAMETER(SHIFT_FACTOR_ID) / 1200.0);
 
-	int midi_note = -1;
 	for (auto metadata : midiMessages) {
 		auto message = metadata.getMessage();
-		if (message.isNoteOn()) midi_note = message.getNoteNumber();
+
+		if (message.isNoteOn())
+			for (int channel = 0; channel < num_input_channels; channel++)
+				_pitch_shifters[channel].createVoice(message.getNoteNumber());
+		if (message.isNoteOff())
+			for (int channel = 0; channel < num_input_channels; channel++)
+				_pitch_shifters[channel].deleteVoice(message.getNoteNumber());
+
 		midi_display.setMidiMessage(message);
 	}
 
@@ -65,7 +72,6 @@ void LiveSamplerAudioProcessor::processBlock(AudioBuffer<float>& buffer, MidiBuf
 	for (int channel = 0; channel < num_input_channels; channel++) {
 		auto channel_buffer = buffer.getWritePointer(channel);
 		_pitch_shifters[channel].setMix(mix);
-		if (midi_note > -1) _pitch_shifters[channel].setShiftFrequency(MidiMessage::getMidiNoteInHertz(midi_note));
 		_pitch_shifters[channel].process(channel_buffer, block_size);
 	}
 

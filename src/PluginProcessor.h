@@ -10,7 +10,7 @@ class LiveSamplerAudioProcessor : public AudioProcessor
 	bool _mono;
 	std::shared_ptr<dsp::FFT> _fft;
 	std::vector<PitchShifter> _pitch_shifters;
-	int _note;
+
 public:
 	class MidiDisplay : public ChangeBroadcaster
 	{
