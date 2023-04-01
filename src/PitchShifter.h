@@ -138,7 +138,6 @@ public:
 	PitchShifter();
 	void prepare(float sample_rate, std::shared_ptr<dsp::FFT> fft, int overlap);
 	void process(float*, int num_samples);
-	//void setShift(float shift) { _shift_factor = shift; }
 	void createVoice(int midi_note) { _voices.createVoice(midi_note); }
 	void deleteVoice(int midi_note) { _voices.deleteVoice(midi_note); }
 	void setNumShifters(int new_num) { _voices.setSize(new_num); }

@@ -102,10 +102,10 @@ float PitchShifter::detectPitch(std::vector<float> acfs)
 	}
 
 	int argMin = 0;
-	int argMaxACF = 2;
-	for (int i = 0; i < values.size(); i++) {
+	float threshold = 0.1;
+	for (int i = 2; i < values.size(); i++) {
+		if (values[i] < threshold) { argMin = i; break; }
 		if (values[i] < values[argMin]) argMin = i;
-		if (i > 1 && acfs[i] > acfs[argMaxACF]) argMaxACF = i;
 	}
 	float sample = argMin;
 #if(_DEBUG)
@@ -114,31 +114,36 @@ float PitchShifter::detectPitch(std::vector<float> acfs)
 	return _sample_rate / sample;
 }
 
-std::vector<int> getPeaks(const std::vector<dsp::Complex<float>>& frame)
+std::vector<float> getPeaks(const std::vector<dsp::Complex<float>>& frame)
 {
-	std::vector<int> peaks;
-	float prev_2 = std::abs(frame[0]);
-	float prev_1 = std::abs(frame[1]);
-	float curr   = std::abs(frame[2]);
-	float next_1 = std::abs(frame[3]);
-	float next_2 = std::abs(frame[4]);
+	std::vector<float> peaks;
+	std::vector<float> mags(frame.size());
+	std::transform(frame.begin(), frame.end(), mags.begin(),
+		[](dsp::Complex<float> f) { return std::abs(f); });
 	for (int i = 2; i < frame.size() - 2; i++) {
-		if (curr > prev_2
-			&& curr > prev_1
-			&& curr > next_1
-			&& curr > next_2) peaks.push_back(i);
-		prev_2 = prev_1;
-		prev_1 = curr;
-		curr = next_1;
-		next_1 = next_2;
-		next_2 = std::abs(frame[i + 2]);
+		if (mags[i] > mags[i - 2]
+			&& mags[i] > mags[i - 1]
+			&& mags[i] > mags[i + 1]
+			&& mags[i] > mags[i + 2]) {
+
+			double x1 = i, x2 = i - 1, x3 = i + 1,
+				y1 = mags[i], y2 = mags[i - 1], y3 = mags[i + 1];
+
+			double denom = (x1 - x2) * (x1 - x3) * (x2 - x3);
+			double a = 2 * (x3 * (y2 - y1) + x2 * (y1 - y3) + x1 * (y3 - y2)) / denom;
+			double b = (std::pow(x3, 2) * (y1 - y2)
+				+ std::pow(x2, 2) * (y3 - y1)
+				+ std::pow(x1, 2) * (y2 - y3)) / denom;
+
+			peaks.push_back(-b / a);
+		}
 	}
 	return peaks;
 }
 
 void PitchShifter::shiftPitch(std::vector<dsp::Complex<float>>& frame)
 {
-	std::vector<int> peaks = getPeaks(frame);
+	std::vector<float> peaks = getPeaks(frame);
 	auto num_bins = _fft->getSize();
 	float pi = MathConstants<float>::pi;
 	std::vector<dsp::Complex<float>> processed_frame(num_bins);
@@ -154,7 +159,10 @@ void PitchShifter::shiftPitch(std::vector<dsp::Complex<float>>& frame)
 
 			int start_bin;
 			int end_bin;
-			int bin_shift = peaks[peak] * shift_factor - peaks[peak];
+			float bin_shift = peaks[peak] * shift_factor - peaks[peak];
+			int bin_shift_int = bin_shift;
+			float bin_shift_frac = std::abs(bin_shift - bin_shift_int);
+			float alpha = (1 - bin_shift_frac) / (1 + bin_shift_frac);
 
 			if (peak == 0) start_bin = 0;
 			else start_bin = (peaks[peak] + peaks[peak - 1]) / 2;
@@ -162,12 +170,39 @@ void PitchShifter::shiftPitch(std::vector<dsp::Complex<float>>& frame)
 			if (peak == peaks.size() - 1) end_bin = num_bins;
 			else end_bin = (peaks[peak] + peaks[peak + 1]) / 2;
 
-			for (int bin = start_bin; bin < end_bin; bin++) {
-				int new_bin = bin + bin_shift;
+			if (bin_shift < 0) for (int bin = start_bin; bin < end_bin; bin++) {
+				int new_bin = bin + bin_shift_int;
+
+				// Calculate Thiran interpolation
+				dsp::Complex<float> v = 0,
+					value1 = frame[bin],
+					value2 = bin + 1 < num_bins ? frame[bin + 1] : 0;
+				auto output = bin_shift_frac == 0 ? value1 : value2 + alpha * (value1 - v);
+				v = output;
+
+				// Calculate phase correction
 				running_phase[bin] += 2 * pi * bin_shift / _overlap;
 				dsp::Complex<float> Z(std::cos(running_phase[bin]), std::sin(running_phase[bin]));
-				if (new_bin < 0) shifted_frame[-new_bin] += std::conj(frame[bin] * Z);
-				else if (new_bin < num_bins) shifted_frame[new_bin] += frame[bin] * Z;
+
+				if (new_bin < 0) shifted_frame[-new_bin] += std::conj(output * Z);
+				else if (new_bin < num_bins) shifted_frame[new_bin] += output * Z;
+			}
+			// Run backwards if shifting down
+			else for (int bin = end_bin - 1; bin >= start_bin; bin--) {
+				int new_bin = bin + bin_shift_int;
+
+				dsp::Complex<float> v = 0,
+					value1 = frame[bin],
+					value2 = bin - 1 >= 0 ? frame[bin - 1] : 0;
+				auto output = bin_shift_frac == 0 ? value1 : value2 + alpha * (value1 - v);
+				v = output;
+
+				running_phase[bin] += 2 * pi * bin_shift / _overlap;
+				dsp::Complex<float> Z(std::cos(running_phase[bin]), std::sin(running_phase[bin]));
+
+				if (new_bin < 0) shifted_frame[-new_bin] += std::conj(output * Z);
+				else if (new_bin < num_bins) shifted_frame[new_bin] += output * Z;
+
 			}
 		}
 		for (int bin = 0; bin < num_bins; bin++)
