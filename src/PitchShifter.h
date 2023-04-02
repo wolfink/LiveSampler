@@ -69,7 +69,8 @@ class PitchShifter
 	std::shared_ptr<dsp::FFT> _fft;
 	uptr<dsp::WindowingFunction<float>> _window;
 	int _overlap;
-	float _pitch;
+	float _pitch_estimates[3];
+	float _pitch_differences[3];
 	float _sample_rate;
 	float _mix;
 

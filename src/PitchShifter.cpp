@@ -5,7 +5,7 @@ PitchShifter::PitchShifter() :
 	_out(0),
 	_overlap(0),
 	_sample_rate(0.0),
-	_pitch(440.0),
+	_pitch_estimates{ 440.0, 440.0, 440.0 },
 	_voices(*this),
 	_mix(0.5)
 {
@@ -69,7 +69,9 @@ void PitchShifter::processFrame()
 	_fft->perform(acfs.data(), acfs2.data(), true);
 	std::transform(acfs2.begin(), acfs2.end(), acfsf.begin(),
 		[](dsp::Complex<float> c) -> float { return c.real(); });
-	_pitch = detectPitch(acfsf);
+	_pitch_estimates[0] = _pitch_estimates[1];
+	_pitch_estimates[1] = _pitch_estimates[2];
+	_pitch_estimates[2] = detectPitch(acfsf);
 	}
 
 	shiftPitch(processing);
@@ -109,20 +111,27 @@ float PitchShifter::detectPitch(std::vector<float> acfs)
 		else        values[L] *= L / sum;
 	}
 
-	float sample = 0;
+	int sample = 0;
+	float sample_frac = 0.0;
 	const float threshold = 0.1;
 	const int values_size = values.size();
 	for (int i = 2; i < values_size; i++) {
 		if (i < values_size - 1 && values[i] < threshold) {
-			sample = parabolaMaxMin(i, values[i], i - 1, values[i - 1], i + 1, values[i + 1]);
+			sample = i;
 			break;
 		}
-		if (values[i] < values[(int) sample]) sample = i;
+		if (values[i] < values[sample]) sample = i;
 	}
-#if(_DEBUG)
-		getDebugVariableBroadcaster().setVariable(_sample_rate / sample);
-#endif
-	return _sample_rate / sample;
+	if (sample > 0 && sample < values_size - 1)
+		sample_frac = parabolaMaxMin(
+			sample, values[sample],
+			sample - 1, values[sample - 1],
+			sample + 1, values[sample + 1]);
+	else sample_frac = sample;
+	_pitch_differences[0] = _pitch_differences[1];
+	_pitch_differences[1] = _pitch_differences[2];
+	_pitch_differences[2] = values[sample];
+	return _sample_rate / sample_frac;
 }
 
 std::vector<float> getPeaks(const std::vector<dsp::Complex<float>>& frame)
@@ -159,7 +168,18 @@ void PitchShifter::shiftPitch(std::vector<dsp::Complex<float>>& frame)
 	for (int voice = 0; voice < _voices.getSize(); voice++) {
 
 		const float freq = _voices.getVoice(voice);
-		const float shift_factor = freq / _pitch;
+		const float pitch = [this]() {
+			float pitch = _pitch_estimates[0];
+			if (_pitch_differences[0] <= _pitch_differences[1]
+				&& _pitch_differences[0] <= _pitch_differences[2]) pitch = _pitch_estimates[0];
+			else if (_pitch_differences[1] < _pitch_differences[2]) pitch = _pitch_estimates[1];
+			else pitch = _pitch_estimates[2];
+#if(_DEBUG)
+			getDebugVariableBroadcaster().setVariable(pitch);
+#endif
+			return pitch;
+		}();
+		const float shift_factor = freq / pitch;
 
 		auto running_phase = _voices.getPhase(voice);
 		std::vector<dsp::Complex<float>> shifted_frame(num_bins);
