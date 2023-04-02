@@ -39,16 +39,14 @@ void PitchShifter::process(float* samples, int num_samples)
 
 void PitchShifter::processFrame()
 {
-	//_shift_factor = detectPitch(2, 110) / _shift_frequency;
-	//if (_shift_factor < 0.0) _shift_factor = 1.0;
-	//_shift_factor = 1.0;
-	int fft_size = _fft->getSize();
+	const int fft_size = _fft->getSize();
+	const int hopsize = fft_size / _overlap;
+
 	std::vector<dsp::Complex<float>>
 		in_out(fft_size),
 		acfs(fft_size),
 		acfs2(fft_size),
 		processing(fft_size);
-	int hopsize = fft_size / _overlap;
 
 	// Multiply frame by window function
 	{
@@ -88,9 +86,19 @@ void PitchShifter::processFrame()
 	}
 }
 
+inline float parabolaMaxMin(double x1, double y1, double x2, double y2, double x3, double y3)
+{
+	const double denom = (x1 - x2) * (x1 - x3) * (x2 - x3);
+	const double a = 2 * (x3 * (y2 - y1) + x2 * (y1 - y3) + x1 * (y3 - y2)) / denom;
+	const double b = (std::pow(x3, 2) * (y1 - y2)
+		+ std::pow(x2, 2) * (y3 - y1)
+		+ std::pow(x1, 2) * (y2 - y3)) / denom;
+	return -b / a;
+}
+
 float PitchShifter::detectPitch(std::vector<float> acfs)
 {
-	int frame_size = acfs.size();
+	const int frame_size = acfs.size();
 	std::vector<float> values(frame_size);
 
 	float sum = 0.0;
@@ -101,13 +109,16 @@ float PitchShifter::detectPitch(std::vector<float> acfs)
 		else        values[L] *= L / sum;
 	}
 
-	int argMin = 0;
-	float threshold = 0.1;
-	for (int i = 2; i < values.size(); i++) {
-		if (values[i] < threshold) { argMin = i; break; }
-		if (values[i] < values[argMin]) argMin = i;
+	float sample = 0;
+	const float threshold = 0.1;
+	const int values_size = values.size();
+	for (int i = 2; i < values_size; i++) {
+		if (i < values_size - 1 && values[i] < threshold) {
+			sample = parabolaMaxMin(i, values[i], i - 1, values[i - 1], i + 1, values[i + 1]);
+			break;
+		}
+		if (values[i] < values[(int) sample]) sample = i;
 	}
-	float sample = argMin;
 #if(_DEBUG)
 		getDebugVariableBroadcaster().setVariable(_sample_rate / sample);
 #endif
@@ -129,13 +140,9 @@ std::vector<float> getPeaks(const std::vector<dsp::Complex<float>>& frame)
 			double x1 = i, x2 = i - 1, x3 = i + 1,
 				y1 = mags[i], y2 = mags[i - 1], y3 = mags[i + 1];
 
-			double denom = (x1 - x2) * (x1 - x3) * (x2 - x3);
-			double a = 2 * (x3 * (y2 - y1) + x2 * (y1 - y3) + x1 * (y3 - y2)) / denom;
-			double b = (std::pow(x3, 2) * (y1 - y2)
-				+ std::pow(x2, 2) * (y3 - y1)
-				+ std::pow(x1, 2) * (y2 - y3)) / denom;
+			float peak_est = parabolaMaxMin(i, mags[i], i - 1, mags[i - 1], i + 1, mags[i + 1]);
 
-			peaks.push_back(-b / a);
+			peaks.push_back(peak_est);
 		}
 	}
 	return peaks;
@@ -143,26 +150,28 @@ std::vector<float> getPeaks(const std::vector<dsp::Complex<float>>& frame)
 
 void PitchShifter::shiftPitch(std::vector<dsp::Complex<float>>& frame)
 {
-	std::vector<float> peaks = getPeaks(frame);
-	auto num_bins = _fft->getSize();
-	float pi = MathConstants<float>::pi;
+	const std::vector<float> peaks = getPeaks(frame);
+	const auto num_bins = _fft->getSize();
+	const float pi = MathConstants<float>::pi;
+
 	std::vector<dsp::Complex<float>> processed_frame(num_bins);
 
 	for (int voice = 0; voice < _voices.getSize(); voice++) {
 
-		float freq = _voices.getVoice(voice);
+		const float freq = _voices.getVoice(voice);
+		const float shift_factor = freq / _pitch;
+
 		auto running_phase = _voices.getPhase(voice);
-		float shift_factor = freq / _pitch;
 		std::vector<dsp::Complex<float>> shifted_frame(num_bins);
 
 		for (int peak = 0; peak < peaks.size(); peak++) {
+			const float bin_shift = peaks[peak] * shift_factor - peaks[peak];
+			const int bin_shift_int = bin_shift;
+			const float bin_shift_frac = std::abs(bin_shift - bin_shift_int);
+			const float alpha = (1 - bin_shift_frac) / (1 + bin_shift_frac);
 
 			int start_bin;
 			int end_bin;
-			float bin_shift = peaks[peak] * shift_factor - peaks[peak];
-			int bin_shift_int = bin_shift;
-			float bin_shift_frac = std::abs(bin_shift - bin_shift_int);
-			float alpha = (1 - bin_shift_frac) / (1 + bin_shift_frac);
 
 			if (peak == 0) start_bin = 0;
 			else start_bin = (peaks[peak] + peaks[peak - 1]) / 2;
@@ -184,17 +193,21 @@ void PitchShifter::shiftPitch(std::vector<dsp::Complex<float>>& frame)
 				running_phase[bin] += 2 * pi * bin_shift / _overlap;
 				dsp::Complex<float> Z(std::cos(running_phase[bin]), std::sin(running_phase[bin]));
 
-				if (new_bin < 0) shifted_frame[-new_bin] += std::conj(output * Z);
-				else if (new_bin < num_bins) shifted_frame[new_bin] += output * Z;
+				output *= Z;
+				if (new_bin < 0) {
+					new_bin = -new_bin;
+					output = std::conj(output);
+				}
+				if (new_bin < num_bins) shifted_frame[new_bin] += output;
 			}
 			// Run backwards if shifting down
 			else for (int bin = end_bin - 1; bin >= start_bin; bin--) {
-				int new_bin = bin + bin_shift_int;
+				const int new_bin = bin + bin_shift_int;
 
 				dsp::Complex<float> v = 0,
 					value1 = frame[bin],
 					value2 = bin - 1 >= 0 ? frame[bin - 1] : 0;
-				auto output = bin_shift_frac == 0 ? value1 : value2 + alpha * (value1 - v);
+				const auto output = bin_shift_frac == 0 ? value1 : value2 + alpha * (value1 - v);
 				v = output;
 
 				running_phase[bin] += 2 * pi * bin_shift / _overlap;
